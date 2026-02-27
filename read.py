@@ -1,33 +1,42 @@
 ###############################################################
-# CONFIGURAZIONE MODALITÀ
+# CONFIGURAZIONE
 ###############################################################
-DEBUG_MODE = True   # True allora debug con finestra; False allora gara senza GUI
-CAM = True          # True allora camera attacata altrimenti camera computer base
-
+DEBUG_MODE = True  # True = debug con finestra; False = gara
+USE_TFLITE = True  # True = usa modello TFLite, False = usa Keras
+CAM = True  # True = camera esterna, False = webcam PC
 
 import cv2
 import numpy as np
 from collections import deque
-from tensorflow.keras.models import load_model
-
-model = load_model("greek_letters_model_folder")
+import time
 
 ###############################################################
 # CLASSI DEL MODELLO (ordine identico al training)
 ###############################################################
-GREEK_CLASSES = ["PHI", "PSI", "OMEGA"]
+GREEK_CLASSES = ["PHI", "PSI", "OMEGA", "EMPTY"]
 
-
-# Soglia minima di confidenza
 CONF_THRESHOLD = 0.80
-
-# Stabilizzazione: numero di frame da considerare
 STABILITY_FRAMES = 5
 history = deque(maxlen=STABILITY_FRAMES)
 
+###############################################################
+# CARICAMENTO MODELLO
+###############################################################
+if USE_TFLITE:
+    import tensorflow as tf
+
+    interpreter = tf.lite.Interpreter(model_path="greek_letters_model.tflite")
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+else:
+    from tensorflow.keras.models import load_model
+
+    model = load_model("best_model.keras")
+
 
 ###############################################################
-# PREPROCESSING (identico al training)
+# PREPROCESSING
 ###############################################################
 def preprocess(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -39,11 +48,17 @@ def preprocess(frame):
 
 
 ###############################################################
-# RICONOSCIMENTO SINGOLO FRAME
+# PREDIZIONE SINGOLO FRAME
 ###############################################################
-def recognize_single(frame):
+def predict_frame(frame):
     inp = preprocess(frame)
-    pred = model.predict(inp, verbose=0)[0]
+
+    if USE_TFLITE:
+        interpreter.set_tensor(input_details[0]['index'], inp)
+        interpreter.invoke()
+        pred = interpreter.get_tensor(output_details[0]['index'])[0]
+    else:
+        pred = model.predict(inp, verbose=0)[0]
 
     idx = np.argmax(pred)
     prob = pred[idx]
@@ -54,13 +69,13 @@ def recognize_single(frame):
 
 
 ###############################################################
-# FILTRO DI STABILIZZAZIONE
-# Restituisce una lettera solo se appare coerente su più frame
+# STABILIZZAZIONE
 ###############################################################
-def stabilized_recognition(letter):
+def stabilized(letter):
     history.append(letter)
 
-    if history.count(letter) >= STABILITY_FRAMES * 0.6 and letter != "NULL":
+    # deve apparire almeno 5 volte su 5
+    if history.count(letter) >= STABILITY_FRAMES and letter != "NULL":
         return letter
 
     return "NULL"
@@ -69,17 +84,18 @@ def stabilized_recognition(letter):
 ###############################################################
 # LOOP PRINCIPALE
 ###############################################################
-
 if CAM:
-    tmp = 0
+    cam_index = 0
 else:
-    tmp = 1
+    cam_index = 1
 
-cap = cv2.VideoCapture(tmp, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)
 
 if not cap.isOpened():
     print("Errore: impossibile aprire la webcam.")
     exit()
+
+print("Sistema pronto. Premi C per riconoscere (debug) oppure avvia gara.")
 
 while True:
     ret, frame = cap.read()
@@ -92,17 +108,17 @@ while True:
         key = cv2.waitKey(1) & 0xFF
 
         if key == ord('c'):
-            letter, prob = recognize_single(frame)
-            stable = stabilized_recognition(letter)
+            letter, prob = predict_frame(frame)
+            stable = stabilized(letter)
 
             if stable != "NULL":
-                print(f"[DEBUG] Lettera stabile: {stable} (conf={prob:.2f})")
+                print(f"[STABILE] {stable} (conf={prob:.2f})")
                 cv2.putText(frame, f"{stable} ({prob:.2f})", (10, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0,255,0), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)
             else:
-                print(f"[DEBUG] Nessuna lettera (conf={prob:.2f})")
+                print(f"[NO] {letter} (conf={prob:.2f})")
                 cv2.putText(frame, "NULL", (10, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0,0,255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 2)
 
             cv2.imshow("DEBUG - Webcam", frame)
 
@@ -111,13 +127,12 @@ while True:
 
     else:
         # Modalità gara: nessuna finestra, riconoscimento continuo
-        letter, prob = recognize_single(frame)
-        stable = stabilized_recognition(letter)
+        letter, prob = predict_frame(frame)
+        stable = stabilized(letter)
 
         if stable != "NULL":
             print(stable)
             break
-
 
 cap.release()
 if DEBUG_MODE:
