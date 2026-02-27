@@ -144,7 +144,7 @@ def camera_like_transform(img):
 # ============================
 # GENERAZIONE DATASET
 # ============================
-
+#sdgfhj
 def generate_dataset():
     if OUT_DIR.exists():
         shutil.rmtree(OUT_DIR)
