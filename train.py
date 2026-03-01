@@ -13,7 +13,7 @@ import tensorflow as tf
 # ============================
 
 DATASET_PATH = "synthetic_dataset"   # cartella con OMEGA/PHI/PSI/EMPTY
-LETTERS = ["PHI", "PSI", "OMEGA", "EMPTY"]
+LETTERS = ["OMEGA", "PHI", "PSI", "EMPTY"]
 IMG_SIZE = 128
 
 # ============================
