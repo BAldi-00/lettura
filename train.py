@@ -105,31 +105,29 @@ reduce_lr = ReduceLROnPlateau(
 history = model.fit(
     X_train, y_train,
     validation_data=(X_test, y_test),
-    epochs=60,
+    epochs=80,
     batch_size=32,
     callbacks=[checkpoint, early, reduce_lr]
 )
 
 # ============================
-# SALVATAGGIO MODELLO TF
+# ESPORTAZIONE TFLITE (AGGIORNATO PER KERAS 3)
 # ============================
+print("Salvataggio modello per il PC (formato Keras 3)...")
+model.save("greek_letters_model_finale.keras")
 
-model.save("greek_letters_model_folder", save_format="tf")
+print("Conversione in TFLite per il Robot in corso...")
+# Usiamo from_keras_model invece di from_saved_model!
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
 
-# ============================
-# ESPORTAZIONE TFLITE
-# ============================
-
-converter = tf.lite.TFLiteConverter.from_saved_model("greek_letters_model_folder")
-# opzionale: ottimizzazioni per embedded
+# Ottimizzazione fondamentale per la memoria dei robot (quantizzazione base)
 converter.optimizations = [tf.lite.Optimize.DEFAULT]
 tflite_model = converter.convert()
 
 with open("greek_letters_model.tflite", "wb") as f:
     f.write(tflite_model)
 
-print("Salvati:")
-print("- best_model.keras")
-print("- cartella SavedModel: greek_letters_model_folder")
-print("- modello TFLite: greek_letters_model.tflite")
-print("Classi nell'ordine:", LETTERS)
+print("\n=== ADDESTRAMENTO COMPLETATO CON SUCCESSO! ===")
+print("- Modello per il PC salvato: greek_letters_model_finale.keras")
+print("- Modello per il Robot salvato: greek_letters_model.tflite")
+print(f"Ricorda di usare questo esatto ordine sul robot: {LETTERS}")
