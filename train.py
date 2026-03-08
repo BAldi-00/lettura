@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization, Input
 from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
@@ -55,6 +55,8 @@ X_train, X_test, y_train, y_test = train_test_split(
 # ============================
 
 model = Sequential([
+    Input(shape=(IMG_SIZE, IMG_SIZE, 1)),
+
     Conv2D(32, (3,3), activation='relu', input_shape=(IMG_SIZE, IMG_SIZE, 1)),
     BatchNormalization(),
     Conv2D(32, (3,3), activation='relu'),
